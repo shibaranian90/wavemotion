@@ -73,9 +73,6 @@
           <span id="current-user-name" class="text-xs font-semibold text-slate-200 block"></span>
           <span class="text-[10px] text-emerald-400">● 認証中(24h有効)</span>
         </div>
-        <button id="btn-settings" class="p-2 text-slate-400 hover:text-white rounded-full hover:bg-slate-800 transition" title="接続設定">
-          <i data-lucide="settings" class="w-4 h-4"></i>
-        </button>
         <button id="btn-logout" class="bg-slate-800 hover:bg-red-900/60 text-slate-300 hover:text-red-200 text-xs px-2.5 py-1.5 rounded-md border border-slate-700 transition flex items-center space-x-1 shadow-sm">
           <i data-lucide="log-out" class="w-3.5 h-3.5"></i>
           <span>退出</span>
@@ -88,17 +85,6 @@
        メインコンテンツコンテナ
   =============================== -->
   <main class="max-w-4xl w-full mx-auto px-3 sm:px-4 flex-1 py-4">
-
-    <!-- 接続先GAS未設定時のアラートバー -->
-    <div id="gas-warning-banner" class="hidden mb-4 bg-amber-50 border-l-4 border-amber-500 p-3 rounded shadow-sm text-xs text-amber-800 flex items-center justify-between">
-      <div class="flex items-center space-x-2">
-        <i data-lucide="alert-triangle" class="w-4 h-4 text-amber-600 flex-shrink-0"></i>
-        <span>現在<strong>デモモード</strong>で動作中です。スプレッドシート連携URLを設定してください。</span>
-      </div>
-      <button onclick="openSettingsModal()" class="bg-amber-600 hover:bg-amber-700 text-white font-bold px-2.5 py-1 rounded text-xs ml-2 flex-shrink-0">
-        URL設定
-      </button>
-    </div>
 
     <!-- 検索・絞り込み・新規追加バー -->
     <section id="control-panel" class="hidden space-y-3 mb-5">
@@ -190,25 +176,12 @@
   <div id="modal-login" class="fixed inset-0 bg-slate-900/80 backdrop-blur-sm z-50 flex items-center justify-center p-4 hidden">
     <div class="bg-white w-full max-w-sm rounded-2xl shadow-2xl p-6 border border-slate-100 animate-in fade-in zoom-in-95">
       
-      <!-- GAS未設定時のガイダンス -->
-      <div id="login-gas-alert" class="hidden mb-4 bg-amber-50 border border-amber-200 p-3 rounded-xl text-xs text-amber-900">
-        <div class="flex items-center space-x-1.5 font-bold mb-1 text-amber-800">
-          <i data-lucide="info" class="w-4 h-4 text-amber-600 flex-shrink-0"></i>
-          <span>初期セットアップ</span>
-        </div>
-        <p class="text-[11px] text-slate-600 mb-2">スプレッドシート連携URLがまだ設定されていません。先に設定を行ってください。</p>
-        <button type="button" onclick="openSettingsModal()" class="w-full bg-amber-500 hover:bg-amber-600 text-slate-950 font-bold py-1.5 px-3 rounded-lg text-xs transition flex items-center justify-center space-x-1 shadow-sm">
-          <i data-lucide="settings" class="w-3.5 h-3.5"></i>
-          <span>GAS連携URLを設定する</span>
-        </button>
-      </div>
-
-      <div class="text-center mb-5">
+      <div class="text-center mb-6">
         <div class="w-12 h-12 bg-slate-900 text-amber-500 rounded-xl flex items-center justify-center mx-auto mb-3 shadow-md">
           <i data-lucide="shield-check" class="w-7 h-7"></i>
         </div>
         <h2 class="text-lg font-bold text-slate-900">アクセス認証</h2>
-        <p class="text-xs text-slate-500 mt-1">スプレッドシートに登録されている<br>氏名とアクセスコードを入力してください。</p>
+        <p class="text-xs text-slate-500 mt-1">氏名とアクセスコードを入力してください。</p>
       </div>
 
       <form id="form-login" class="space-y-4">
@@ -228,13 +201,6 @@
           <i data-lucide="arrow-right" class="w-4 h-4"></i>
         </button>
       </form>
-
-      <div class="mt-4 pt-3 border-t border-slate-100 text-center">
-        <button type="button" onclick="openSettingsModal()" class="text-xs text-slate-500 hover:text-slate-800 font-medium inline-flex items-center space-x-1">
-          <i data-lucide="settings" class="w-3.5 h-3.5"></i>
-          <span>連携URLの変更・設定はこちら</span>
-        </button>
-      </div>
     </div>
   </div>
 
@@ -270,7 +236,7 @@
   </div>
 
   <!-- ==========================================
-       MODAL 3: 削除専用確認モーダル (専用UIで確実動作)
+       MODAL 3: 削除専用確認モーダル
   ========================================== -->
   <div id="modal-delete-confirm" class="fixed inset-0 bg-slate-900/70 backdrop-blur-sm z-50 flex items-center justify-center p-4 hidden">
     <div class="bg-white w-full max-w-sm rounded-2xl shadow-2xl p-5 border border-slate-100 animate-in fade-in zoom-in-95">
@@ -413,79 +379,22 @@
     </div>
   </div>
 
-  <!-- ==========================================
-       MODAL 5: GASエンドポイントURL設定 (最前面: z-[60])
-  ========================================== -->
-  <div id="modal-settings" class="fixed inset-0 bg-slate-900/80 backdrop-blur-sm z-[60] flex items-center justify-center p-4 hidden">
-    <div class="bg-white w-full max-w-md rounded-2xl shadow-2xl p-6 border border-slate-100 animate-in fade-in zoom-in-95">
-      <div class="flex items-center justify-between mb-3">
-        <h3 class="text-sm font-bold text-slate-900 flex items-center space-x-2">
-          <div class="p-1.5 bg-slate-100 rounded-lg text-slate-800">
-            <i data-lucide="database" class="w-4 h-4"></i>
-          </div>
-          <span>Google Apps Script 連携URL設定</span>
-        </h3>
-        <button onclick="closeSettingsModal()" class="text-slate-400 hover:text-slate-600 p-1">
-          <i data-lucide="x" class="w-4 h-4"></i>
-        </button>
-      </div>
-      <p class="text-xs text-slate-500 mb-4 leading-relaxed">
-        デプロイしたGAS WebアプリのURL（<code class="bg-slate-100 px-1 py-0.5 rounded text-[11px] text-slate-700 font-mono">https://script.google.com/macros/s/.../exec</code>）を貼り付けてください。
-      </p>
-      
-      <div class="space-y-4">
-        <div>
-          <label class="block text-xs font-bold text-slate-700 mb-1">ウェブアプリのURL:</label>
-          <input type="url" id="input-gas-url" placeholder="https://script.google.com/macros/s/.../exec" class="w-full px-3 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs focus:ring-2 focus:ring-slate-900 font-mono">
-        </div>
-        <div class="flex justify-between items-center pt-2">
-          <button onclick="clearGasUrl()" class="text-xs text-red-600 hover:underline">リセット (初期化)</button>
-          <div class="space-x-2">
-            <button onclick="closeSettingsModal()" class="px-3 py-2 bg-slate-100 text-slate-700 font-bold rounded-xl text-xs hover:bg-slate-200 transition">
-              閉じる
-            </button>
-            <button onclick="saveGasUrl()" class="px-4 py-2 bg-slate-900 text-white font-bold rounded-xl text-xs hover:bg-slate-800 transition shadow">
-              設定を保存
-            </button>
-          </div>
-        </div>
-      </div>
-    </div>
-  </div>
-
   <!-- ===============================
        JavaScript アプリケーションロジック
   =============================== -->
   <script>
+    // 連携先GAS WebアプリURL（組み込み済み）
+    const DEFAULT_GAS_URL = "https://script.google.com/macros/s/AKfycbwm5OoN5008gEk7ICxE_d3qd-lD-nrlMUB_HEPEw9QOjlcobfZYxBiMan3ItCocOCr5Mg/exec";
+    
     const AUTH_PASSCODE = "0001";
     const SESSION_HOURS = 24;
     const STORAGE_KEY_AUTH = "steel_transport_auth_session";
-    const STORAGE_KEY_GAS_URL = "steel_transport_gas_url";
 
     const WEEKDAYS = ["日", "月", "火", "水", "木", "金", "土"];
 
-    // デモ用モックデータ
-    const DEFAULT_MOCK_DATA = [
-      {
-        id: "mock-1",
-        project_name: "もりの里A棟",
-        loading_location: "中出鉄工",
-        date: getFormattedDate(0),
-        arrival_time: "08:30",
-        transport_company: "オオニシ",
-        vehicle_number: "金沢90",
-        driver_name: "オクノ",
-        phone_number: "08086994730",
-        section: "1工区 2節",
-        cargo_details: "大梁2台4ｔ",
-        remarks: "金沢マラソンで交通規制あり",
-        updated_at: "2026/08/30 07:33"
-      }
-    ];
-
     let state = {
       user: null,
-      gasUrl: localStorage.getItem(STORAGE_KEY_GAS_URL) || "",
+      gasUrl: DEFAULT_GAS_URL,
       items: [],
       currentFilterDate: getFormattedDate(0),
       selectedProject: "ALL",
@@ -630,12 +539,6 @@
       document.getElementById("header-user-area").classList.remove("hidden");
       document.getElementById("control-panel").classList.remove("hidden");
       document.getElementById("current-user-name").textContent = state.user.name + " 様";
-      
-      if (!state.gasUrl) {
-        document.getElementById("gas-warning-banner").classList.remove("hidden");
-      } else {
-        document.getElementById("gas-warning-banner").classList.add("hidden");
-      }
 
       fetchTransportData();
     }
@@ -645,19 +548,9 @@
       document.getElementById("header-user-area").classList.add("hidden");
       document.getElementById("control-panel").classList.add("hidden");
       document.getElementById("cards-wrapper").innerHTML = "";
-
-      if (!state.gasUrl) {
-        document.getElementById("login-gas-alert").classList.remove("hidden");
-      } else {
-        document.getElementById("login-gas-alert").classList.add("hidden");
-      }
     }
 
     async function apiPost(action, payload = {}) {
-      if (!state.gasUrl) {
-        return handleMockApi(action, payload);
-      }
-
       try {
         const bodyData = {
           action: action,
@@ -682,48 +575,8 @@
         return data;
       } catch (err) {
         console.error("API Error:", err);
-        return { success: false, error: "通信に失敗しました。URLと接続を確認してください。" };
+        return { success: false, error: "通信に失敗しました。接続環境を確認してください。" };
       }
-    }
-
-    function handleMockApi(action, payload) {
-      return new Promise((resolve) => {
-        setTimeout(() => {
-          if (action === "login") {
-            resolve({ success: true, user: { name: payload.name, code: payload.code } });
-          } else if (action === "getData") {
-            if (state.items.length === 0) {
-              state.items = [...DEFAULT_MOCK_DATA];
-            }
-            resolve({ success: true, data: state.items });
-          } else if (action === "saveData") {
-            if (payload.password !== AUTH_PASSCODE) {
-              resolve({ success: false, error: "パスワードが正しくありません" });
-              return;
-            }
-            const item = payload.item;
-            const nowStr = new Date().toISOString().replace('T', ' ').slice(0, 16);
-            if (item.id) {
-              const idx = state.items.findIndex(x => x.id === item.id);
-              if (idx !== -1) {
-                state.items[idx] = { ...item, updated_at: nowStr };
-              }
-            } else {
-              item.id = "mock-" + Date.now();
-              item.updated_at = nowStr;
-              state.items.unshift(item);
-            }
-            resolve({ success: true, data: state.items });
-          } else if (action === "deleteData") {
-            if (payload.password !== AUTH_PASSCODE) {
-              resolve({ success: false, error: "パスワードが正しくありません" });
-              return;
-            }
-            state.items = state.items.filter(x => x.id !== payload.id);
-            resolve({ success: true, data: state.items });
-          }
-        }, 200);
-      });
     }
 
     async function fetchTransportData() {
@@ -987,9 +840,6 @@
         showToast("ログアウトしました", "info");
       });
 
-      // 設定モーダル
-      document.getElementById("btn-settings").addEventListener("click", openSettingsModal);
-
       // 日付切り替えボタン
       const btnToday = document.getElementById("filter-today");
       const btnTomorrow = document.getElementById("filter-tomorrow");
@@ -1192,7 +1042,6 @@
       });
     }
 
-    // 削除確認モーダルを開く
     function requestDeleteItem(id) {
       const item = state.items.find(x => x.id === id);
       if (!item) return;
@@ -1252,48 +1101,6 @@
 
     function closeEditModal() {
       document.getElementById("modal-edit-form").classList.add("hidden");
-    }
-
-    function openSettingsModal() {
-      document.getElementById("input-gas-url").value = state.gasUrl;
-      document.getElementById("modal-settings").classList.remove("hidden");
-      lucide.createIcons();
-    }
-
-    function closeSettingsModal() {
-      document.getElementById("modal-settings").classList.add("hidden");
-    }
-
-    function saveGasUrl() {
-      const url = document.getElementById("input-gas-url").value.trim();
-      state.gasUrl = url;
-      localStorage.setItem(STORAGE_KEY_GAS_URL, url);
-      closeSettingsModal();
-      
-      document.getElementById("login-gas-alert").classList.add("hidden");
-      if (url) {
-        document.getElementById("gas-warning-banner").classList.add("hidden");
-      } else {
-        document.getElementById("gas-warning-banner").classList.remove("hidden");
-      }
-      
-      showToast("GAS連携URLを保存しました", "success");
-      if (state.user) {
-        fetchTransportData();
-      }
-    }
-
-    function clearGasUrl() {
-      state.gasUrl = "";
-      localStorage.removeItem(STORAGE_KEY_GAS_URL);
-      document.getElementById("input-gas-url").value = "";
-      closeSettingsModal();
-      document.getElementById("login-gas-alert").classList.remove("hidden");
-      document.getElementById("gas-warning-banner").classList.remove("hidden");
-      showToast("設定をリセットしました", "info");
-      if (state.user) {
-        fetchTransportData();
-      }
     }
   </script>
 </body>
