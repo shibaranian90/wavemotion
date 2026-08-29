@@ -9,7 +9,6 @@
   <!-- Lucide Icons CDN -->
   <script src="https://unpkg.com/lucide@latest"></script>
   <style>
-    /* モバイルタップハイライトの除去とタッチ最適化 */
     * {
       -webkit-tap-highlight-color: transparent;
     }
@@ -21,22 +20,50 @@
       background-color: #cbd5e1;
       border-radius: 4px;
     }
+    .no-scrollbar::-webkit-scrollbar {
+      display: none;
+    }
+    .no-scrollbar {
+      -ms-overflow-style: none;
+      scrollbar-width: none;
+    }
+    @keyframes toastIn {
+      from { transform: translateY(-20px); opacity: 0; }
+      to { transform: translateY(0); opacity: 1; }
+    }
+    .animate-toast {
+      animation: toastIn 0.25s ease-out forwards;
+    }
   </style>
 </head>
 <body class="bg-slate-100 text-slate-800 min-h-screen flex flex-col font-sans pb-12">
 
   <!-- ===============================
+       グローバルトースト通知 (Alert代替)
+  =============================== -->
+  <div id="toast-container" class="fixed top-4 left-1/2 transform -translate-x-1/2 z-[100] w-11/12 max-w-sm pointer-events-none flex flex-col gap-2"></div>
+
+  <!-- ===============================
        ヘッダーナビゲーション
   =============================== -->
   <header class="bg-slate-900 text-white sticky top-0 z-30 shadow-md">
-    <div class="max-w-4xl mx-auto px-4 py-3 flex items-center justify-between">
-      <div class="flex items-center space-x-2">
-        <div class="bg-amber-500 text-slate-900 p-1.5 rounded-lg flex items-center justify-center font-black">
+    <div class="max-w-4xl mx-auto px-4 py-2.5 flex items-center justify-between">
+      
+      <!-- タイトル & リアルタイム現在時刻 -->
+      <div class="flex items-center space-x-3">
+        <div class="bg-amber-500 text-slate-900 p-1.5 rounded-lg flex items-center justify-center font-black shadow-sm">
           <i data-lucide="truck" class="w-5 h-5"></i>
         </div>
         <div>
-          <h1 class="text-base font-bold tracking-tight leading-tight">鉄骨運搬情報</h1>
-          <p class="text-[10px] text-slate-400">現場配車・積込共有システム</p>
+          <div class="flex items-center space-x-2 flex-wrap">
+            <h1 class="text-base font-bold tracking-tight leading-none text-white">鉄骨運搬情報</h1>
+            <!-- リアルタイム時計（秒単位） -->
+            <div class="inline-flex items-center space-x-1 bg-slate-800 border border-slate-700 text-amber-400 px-2 py-0.5 rounded-md font-mono text-[11px] font-bold shadow-inner">
+              <i data-lucide="clock" class="w-3 h-3 text-amber-400 animate-pulse"></i>
+              <span id="live-clock">--:--:--</span>
+            </div>
+          </div>
+          <p class="text-[10px] text-slate-400 mt-0.5">現場配車・積込共有システム</p>
         </div>
       </div>
 
@@ -49,7 +76,7 @@
         <button id="btn-settings" class="p-2 text-slate-400 hover:text-white rounded-full hover:bg-slate-800 transition" title="接続設定">
           <i data-lucide="settings" class="w-4 h-4"></i>
         </button>
-        <button id="btn-logout" class="bg-slate-800 hover:bg-red-900/60 text-slate-300 hover:text-red-200 text-xs px-2.5 py-1.5 rounded-md border border-slate-700 transition flex items-center space-x-1">
+        <button id="btn-logout" class="bg-slate-800 hover:bg-red-900/60 text-slate-300 hover:text-red-200 text-xs px-2.5 py-1.5 rounded-md border border-slate-700 transition flex items-center space-x-1 shadow-sm">
           <i data-lucide="log-out" class="w-3.5 h-3.5"></i>
           <span>退出</span>
         </button>
@@ -75,31 +102,45 @@
 
     <!-- 検索・絞り込み・新規追加バー -->
     <section id="control-panel" class="hidden space-y-3 mb-5">
-      <!-- 日付クイック選択タブ -->
+      
+      <!-- 1. 【上段】物件名クイック絞り込みバー (動的生成) -->
+      <div class="bg-white p-2.5 rounded-xl shadow-sm border border-slate-200">
+        <div class="flex items-center space-x-1.5 mb-1.5 text-[11px] font-bold text-slate-600">
+          <i data-lucide="building-2" class="w-3.5 h-3.5 text-amber-500"></i>
+          <span>物件名で絞り込み:</span>
+        </div>
+        <div id="project-filter-container" class="flex items-center gap-1.5 overflow-x-auto no-scrollbar pb-0.5">
+          <button class="px-3 py-1.5 rounded-lg bg-amber-500 text-slate-950 font-bold text-xs whitespace-nowrap shadow-sm">
+            すべての物件
+          </button>
+        </div>
+      </div>
+
+      <!-- 2. 【下段】日付クイック選択タブ & カレンダー指定 -->
       <div class="bg-white p-2 rounded-xl shadow-sm border border-slate-200 flex items-center justify-between gap-1 text-xs font-medium">
-        <div class="flex items-center gap-1 w-full sm:w-auto">
-          <button id="filter-today" class="flex-1 sm:flex-none px-3 py-2 rounded-lg bg-slate-900 text-white font-bold transition">
+        <div class="flex items-center gap-1 w-full sm:w-auto overflow-x-auto no-scrollbar">
+          <button id="filter-today" class="flex-1 sm:flex-none px-3 py-2 rounded-lg bg-slate-900 text-white font-bold transition whitespace-nowrap">
             本日 (<span id="label-today-date"></span>)
           </button>
-          <button id="filter-tomorrow" class="flex-1 sm:flex-none px-3 py-2 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 transition">
+          <button id="filter-tomorrow" class="flex-1 sm:flex-none px-3 py-2 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 transition whitespace-nowrap">
             明日 (<span id="label-tomorrow-date"></span>)
           </button>
-          <button id="filter-all" class="flex-1 sm:flex-none px-3 py-2 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 transition">
+          <button id="filter-all" class="flex-1 sm:flex-none px-3 py-2 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 transition whitespace-nowrap">
             全件
           </button>
         </div>
 
         <!-- カレンダー任意指定 -->
-        <div class="flex items-center space-x-1 pl-2 border-l border-slate-200">
+        <div class="flex items-center space-x-1 pl-2 border-l border-slate-200 flex-shrink-0">
           <input type="date" id="filter-custom-date" class="bg-slate-50 border border-slate-300 text-slate-800 text-xs rounded-lg px-2 py-1.5 focus:outline-none focus:ring-2 focus:ring-slate-900">
         </div>
       </div>
 
-      <!-- 検索窓 & 新規追加ボタン -->
+      <!-- 3. 検索窓 & アクションボタン -->
       <div class="flex flex-col sm:flex-row gap-2">
         <div class="relative flex-1">
           <i data-lucide="search" class="w-4 h-4 text-slate-400 absolute left-3 top-1/2 transform -translate-y-1/2"></i>
-          <input type="text" id="search-input" placeholder="物件名、工区、運搬会社、積込場所で検索..." class="w-full pl-9 pr-8 py-2.5 bg-white border border-slate-200 rounded-xl text-xs sm:text-sm focus:outline-none focus:ring-2 focus:ring-slate-900 shadow-sm">
+          <input type="text" id="search-input" placeholder="工区、運搬会社、積込場所、内容で検索..." class="w-full pl-9 pr-8 py-2.5 bg-white border border-slate-200 rounded-xl text-xs sm:text-sm focus:outline-none focus:ring-2 focus:ring-slate-900 shadow-sm">
           <button id="btn-clear-search" class="hidden absolute right-2.5 top-1/2 transform -translate-y-1/2 text-slate-400 hover:text-slate-600">
             <i data-lucide="x" class="w-4 h-4"></i>
           </button>
@@ -134,7 +175,7 @@
           <i data-lucide="inbox" class="w-6 h-6"></i>
         </div>
         <h3 class="text-sm font-bold text-slate-700">該当する運搬情報はありません</h3>
-        <p class="text-xs text-slate-500 mt-1">日付指定を変更するか、検索条件をクリアしてください。</p>
+        <p class="text-xs text-slate-500 mt-1">日付や物件名の指定を変更するか、検索条件をクリアしてください。</p>
       </div>
 
       <!-- カード一覧動的挿入 -->
@@ -147,7 +188,7 @@
        MODAL 1: 初回ログインモーダル (24h認証)
   ========================================== -->
   <div id="modal-login" class="fixed inset-0 bg-slate-900/80 backdrop-blur-sm z-50 flex items-center justify-center p-4 hidden">
-    <div class="bg-white w-full max-w-sm rounded-2xl shadow-2xl p-6 border border-slate-100">
+    <div class="bg-white w-full max-w-sm rounded-2xl shadow-2xl p-6 border border-slate-100 animate-in fade-in zoom-in-95">
       
       <!-- GAS未設定時のガイダンス -->
       <div id="login-gas-alert" class="hidden mb-4 bg-amber-50 border border-amber-200 p-3 rounded-xl text-xs text-amber-900">
@@ -188,7 +229,6 @@
         </button>
       </form>
 
-      <!-- ログイン画面下部のURL設定リンク -->
       <div class="mt-4 pt-3 border-t border-slate-100 text-center">
         <button type="button" onclick="openSettingsModal()" class="text-xs text-slate-500 hover:text-slate-800 font-medium inline-flex items-center space-x-1">
           <i data-lucide="settings" class="w-3.5 h-3.5"></i>
@@ -199,21 +239,21 @@
   </div>
 
   <!-- ==========================================
-       MODAL 2: 編集パスワード認証モーダル (0001)
+       MODAL 2: 編集・新規追加用 パスワード認証モーダル
   ========================================== -->
   <div id="modal-auth-action" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4 hidden">
-    <div class="bg-white w-full max-w-xs rounded-2xl shadow-xl p-5 border border-slate-100">
+    <div class="bg-white w-full max-w-xs rounded-2xl shadow-xl p-5 border border-slate-100 animate-in fade-in zoom-in-95">
       <div class="text-center mb-4">
         <div class="w-10 h-10 bg-amber-100 text-amber-700 rounded-full flex items-center justify-center mx-auto mb-2">
           <i data-lucide="lock" class="w-5 h-5"></i>
         </div>
-        <h3 class="text-sm font-bold text-slate-900" id="auth-action-title">編集パスワード確認</h3>
-        <p class="text-xs text-slate-500 mt-0.5">追加・編集には専用パスワードが必要です</p>
+        <h3 class="text-sm font-bold text-slate-900" id="auth-action-title">認証パスワード確認</h3>
+        <p class="text-xs text-slate-500 mt-0.5">操作を行うには専用パスワードが必要です</p>
       </div>
 
       <form id="form-auth-action" class="space-y-3">
         <div>
-          <input type="password" id="action-password" maxlength="10" placeholder="パスワード (0001)" class="w-full px-3 py-2.5 text-center text-base tracking-widest bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-amber-500 font-mono">
+          <input type="password" id="action-password" maxlength="10" placeholder="パスワードを入力" class="w-full px-3 py-2.5 text-center text-base tracking-widest bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-amber-500 font-mono">
         </div>
         <div id="action-auth-error" class="hidden text-xs text-center text-red-600 font-semibold">パスワードが正しくありません</div>
 
@@ -221,7 +261,7 @@
           <button type="button" onclick="closeAuthModal()" class="flex-1 py-2.5 bg-slate-100 text-slate-700 hover:bg-slate-200 text-xs font-bold rounded-xl transition">
             キャンセル
           </button>
-          <button type="submit" class="flex-1 py-2.5 bg-slate-900 hover:bg-slate-800 text-white text-xs font-bold rounded-xl transition">
+          <button type="submit" class="flex-1 py-2.5 bg-slate-900 hover:bg-slate-800 text-white text-xs font-bold rounded-xl transition shadow">
             確認
           </button>
         </div>
@@ -230,10 +270,47 @@
   </div>
 
   <!-- ==========================================
-       MODAL 3: 運搬データ 新規登録 / 編集フォーム
+       MODAL 3: 削除専用確認モーダル (専用UIで確実動作)
+  ========================================== -->
+  <div id="modal-delete-confirm" class="fixed inset-0 bg-slate-900/70 backdrop-blur-sm z-50 flex items-center justify-center p-4 hidden">
+    <div class="bg-white w-full max-w-sm rounded-2xl shadow-2xl p-5 border border-slate-100 animate-in fade-in zoom-in-95">
+      <div class="text-center mb-3">
+        <div class="w-11 h-11 bg-red-100 text-red-600 rounded-full flex items-center justify-center mx-auto mb-2 shadow-inner">
+          <i data-lucide="trash-2" class="w-6 h-6"></i>
+        </div>
+        <h3 class="text-sm font-bold text-slate-900">運搬情報の削除確認</h3>
+        <p class="text-xs text-slate-600 mt-1">
+          【<span id="delete-target-title" class="font-bold text-red-600"></span>】の運搬情報を完全に削除します。
+        </p>
+      </div>
+
+      <form id="form-delete-confirm" class="space-y-3">
+        <input type="hidden" id="delete-target-id">
+        <div>
+          <label class="block text-[11px] font-bold text-slate-600 mb-1 text-center">専用パスワードを入力してください</label>
+          <input type="password" id="delete-password" maxlength="10" placeholder="パスワードを入力" required class="w-full px-3 py-2 text-center text-base tracking-widest bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-red-500 font-mono">
+        </div>
+        <div id="delete-auth-error" class="hidden text-xs text-center text-red-600 font-semibold">パスワードが正しくありません</div>
+
+        <div class="flex space-x-2 pt-1">
+          <button type="button" onclick="closeDeleteModal()" class="flex-1 py-2.5 bg-slate-100 text-slate-700 hover:bg-slate-200 text-xs font-bold rounded-xl transition">
+            やめる
+          </button>
+          <button type="submit" id="btn-submit-delete" class="flex-1 py-2.5 bg-red-600 hover:bg-red-700 text-white text-xs font-bold rounded-xl transition shadow flex items-center justify-center space-x-1">
+            <i data-lucide="trash-2" class="w-3.5 h-3.5"></i>
+            <span>削除を実行</span>
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- ==========================================
+       MODAL 4: 運搬データ 新規登録 / 編集フォーム
   ========================================== -->
   <div id="modal-edit-form" class="fixed inset-0 bg-slate-900/70 backdrop-blur-sm z-50 flex items-center justify-center p-3 sm:p-4 hidden overflow-y-auto">
-    <div class="bg-white w-full max-w-lg rounded-2xl shadow-2xl p-5 sm:p-6 border border-slate-100 my-auto max-h-[92vh] flex flex-col">
+    <div class="bg-white w-full max-w-lg rounded-2xl shadow-2xl p-5 sm:p-6 border border-slate-100 my-auto max-h-[92vh] flex flex-col animate-in fade-in zoom-in-95">
+      
       <!-- モーダルヘッダー -->
       <div class="flex items-center justify-between pb-3 border-b border-slate-100 flex-shrink-0">
         <h2 id="edit-form-title" class="text-base font-bold text-slate-900 flex items-center space-x-2">
@@ -250,70 +327,76 @@
         <input type="hidden" id="entry-id">
 
         <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
-          <!-- 物件名 -->
+          <!-- 1. 物件名 -->
           <div class="sm:col-span-2">
             <label class="block font-bold text-slate-700 mb-1">1. 物件名 <span class="text-red-500">*</span></label>
-            <input type="text" id="input-project-name" required placeholder="例: ○○物流センター新築工事" class="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg focus:ring-2 focus:ring-slate-900">
+            <input type="text" id="input-project-name" required placeholder="例: もりの里A棟新築工事" class="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg focus:ring-2 focus:ring-slate-900">
           </div>
 
-          <!-- 日付 -->
+          <!-- 2. 日付 -->
           <div>
-            <label class="block font-bold text-slate-700 mb-1">3. 運搬日付 <span class="text-red-500">*</span></label>
+            <label class="block font-bold text-slate-700 mb-1">2. 運搬日付 <span class="text-red-500">*</span></label>
             <input type="date" id="input-date" required class="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg focus:ring-2 focus:ring-slate-900">
           </div>
 
-          <!-- 工区 -->
+          <!-- 3. 到着時間 -->
           <div>
-            <label class="block font-bold text-slate-700 mb-1">8. 工区 / 節</label>
-            <input type="text" id="input-section" placeholder="例: 1工区 2節 / 北工区" class="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg focus:ring-2 focus:ring-slate-900">
+            <label class="block font-bold text-slate-700 mb-1">3. 到着予定時間</label>
+            <input type="text" id="input-arrival-time" placeholder="例: 08:30 / 午前着" class="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg focus:ring-2 focus:ring-slate-900">
           </div>
 
-          <!-- 積込場所 -->
+          <!-- 4. 工区 -->
           <div class="sm:col-span-2">
-            <label class="block font-bold text-slate-700 mb-1">2. 積込場所 <span class="text-red-500">*</span></label>
-            <input type="text" id="input-loading-location" required placeholder="例: 本社第1鉄骨ヤード (Aヤード)" class="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg focus:ring-2 focus:ring-slate-900">
+            <label class="block font-bold text-slate-700 mb-1">4. 工区 / 節</label>
+            <input type="text" id="input-section" placeholder="例: 1工区 2節 / 東側梁" class="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg focus:ring-2 focus:ring-slate-900">
           </div>
 
-          <!-- 運搬会社 -->
-          <div>
-            <label class="block font-bold text-slate-700 mb-1">4. 運搬会社名</label>
-            <input type="text" id="input-transport-company" placeholder="例: ○○運輸株式会社" class="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg focus:ring-2 focus:ring-slate-900">
-          </div>
-
-          <!-- 車番 -->
-          <div>
-            <label class="block font-bold text-slate-700 mb-1">5. 車番 (ナンバー)</label>
-            <input type="text" id="input-vehicle-number" placeholder="例: 品川 100 か 12-34" class="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg focus:ring-2 focus:ring-slate-900">
-          </div>
-
-          <!-- 運転手名 -->
-          <div>
-            <label class="block font-bold text-slate-700 mb-1">6. 運転手名</label>
-            <input type="text" id="input-driver-name" placeholder="例: 鈴木 健太" class="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg focus:ring-2 focus:ring-slate-900">
-          </div>
-
-          <!-- 電話番号 -->
-          <div>
-            <label class="block font-bold text-slate-700 mb-1">7. 電話番号</label>
-            <input type="tel" id="input-phone-number" placeholder="例: 090-1234-5678" class="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg focus:ring-2 focus:ring-slate-900">
-          </div>
-
-          <!-- 積み込み内容 -->
+          <!-- 5. 積込場所 -->
           <div class="sm:col-span-2">
-            <label class="block font-bold text-slate-700 mb-1">9. 積み込み内容 <span class="text-red-500">*</span></label>
-            <textarea id="input-cargo-details" rows="3" required placeholder="例: 大梁 G1〜G4 (4本)、小梁 b1〜b6 (6本) 計12.5t" class="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg focus:ring-2 focus:ring-slate-900 text-xs sm:text-sm"></textarea>
+            <label class="block font-bold text-slate-700 mb-1">5. 積込場所 <span class="text-red-500">*</span></label>
+            <input type="text" id="input-loading-location" required placeholder="例: 中出鉄工 第1工場" class="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg focus:ring-2 focus:ring-slate-900">
           </div>
 
-          <!-- 備考 -->
+          <!-- 6. 運搬会社 -->
+          <div>
+            <label class="block font-bold text-slate-700 mb-1">6. 運搬会社名</label>
+            <input type="text" id="input-transport-company" placeholder="例: オオニシ運輸" class="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg focus:ring-2 focus:ring-slate-900">
+          </div>
+
+          <!-- 7. 車番 -->
+          <div>
+            <label class="block font-bold text-slate-700 mb-1">7. 車番 (ナンバー)</label>
+            <input type="text" id="input-vehicle-number" placeholder="例: 金沢 90" class="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg focus:ring-2 focus:ring-slate-900">
+          </div>
+
+          <!-- 8. 運転手名 -->
+          <div>
+            <label class="block font-bold text-slate-700 mb-1">8. 運転手名</label>
+            <input type="text" id="input-driver-name" placeholder="例: オクノ" class="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg focus:ring-2 focus:ring-slate-900">
+          </div>
+
+          <!-- 9. 電話番号 -->
+          <div>
+            <label class="block font-bold text-slate-700 mb-1">9. 電話番号</label>
+            <input type="tel" id="input-phone-number" placeholder="例: 080-8699-4730" class="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg focus:ring-2 focus:ring-slate-900">
+          </div>
+
+          <!-- 10. 積み込み内容 -->
           <div class="sm:col-span-2">
-            <label class="block font-bold text-slate-700 mb-1">10. 備考 (進入経路・時間指定等)</label>
-            <textarea id="input-remarks" rows="2" placeholder="例: 現着8:30厳守、東門ゲートより進入。ヘルメット・誘導員配置。" class="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg focus:ring-2 focus:ring-slate-900 text-xs sm:text-sm"></textarea>
+            <label class="block font-bold text-slate-700 mb-1">10. 積み込み内容 <span class="text-red-500">*</span></label>
+            <textarea id="input-cargo-details" rows="3" required placeholder="例: 大梁 2台 4t" class="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg focus:ring-2 focus:ring-slate-900 text-xs sm:text-sm"></textarea>
+          </div>
+
+          <!-- 11. 備考 -->
+          <div class="sm:col-span-2">
+            <label class="block font-bold text-slate-700 mb-1">11. 備考 (進入経路・交通規制等)</label>
+            <textarea id="input-remarks" rows="2" placeholder="例: 金沢マラソンで周辺交通規制あり。西門より搬入。" class="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg focus:ring-2 focus:ring-slate-900 text-xs sm:text-sm"></textarea>
           </div>
         </div>
 
         <!-- アクションボタン -->
         <div class="pt-3 border-t border-slate-100 flex items-center justify-between space-x-2 flex-shrink-0">
-          <button type="button" id="btn-delete-entry" class="hidden bg-red-50 hover:bg-red-100 text-red-600 font-bold px-3 py-2 rounded-xl text-xs transition items-center space-x-1">
+          <button type="button" id="btn-modal-delete-entry" class="hidden bg-red-50 hover:bg-red-100 text-red-600 font-bold px-3 py-2 rounded-xl text-xs transition items-center space-x-1">
             <i data-lucide="trash-2" class="w-3.5 h-3.5"></i>
             <span>削除</span>
           </button>
@@ -331,10 +414,10 @@
   </div>
 
   <!-- ==========================================
-       MODAL 4: GASエンドポイントURL設定 (最前面: z-[60])
+       MODAL 5: GASエンドポイントURL設定 (最前面: z-[60])
   ========================================== -->
   <div id="modal-settings" class="fixed inset-0 bg-slate-900/80 backdrop-blur-sm z-[60] flex items-center justify-center p-4 hidden">
-    <div class="bg-white w-full max-w-md rounded-2xl shadow-2xl p-6 border border-slate-100 animate-in fade-in zoom-in-95 duration-150">
+    <div class="bg-white w-full max-w-md rounded-2xl shadow-2xl p-6 border border-slate-100 animate-in fade-in zoom-in-95">
       <div class="flex items-center justify-between mb-3">
         <h3 class="text-sm font-bold text-slate-900 flex items-center space-x-2">
           <div class="p-1.5 bg-slate-100 rounded-lg text-slate-800">
@@ -343,7 +426,7 @@
           <span>Google Apps Script 連携URL設定</span>
         </h3>
         <button onclick="closeSettingsModal()" class="text-slate-400 hover:text-slate-600 p-1">
-          <i data-lucide="x" class="w-5 h-5"></i>
+          <i data-lucide="x" class="w-4 h-4"></i>
         </button>
       </div>
       <p class="text-xs text-slate-500 mb-4 leading-relaxed">
@@ -374,71 +457,44 @@
        JavaScript アプリケーションロジック
   =============================== -->
   <script>
-    // ==========================================
-    // 1. 定数・初期モックデータ & 状態管理
-    // ==========================================
     const AUTH_PASSCODE = "0001";
     const SESSION_HOURS = 24;
     const STORAGE_KEY_AUTH = "steel_transport_auth_session";
     const STORAGE_KEY_GAS_URL = "steel_transport_gas_url";
 
-    // デモ用サンプルデータ
+    const WEEKDAYS = ["日", "月", "火", "水", "木", "金", "土"];
+
+    // デモ用モックデータ
     const DEFAULT_MOCK_DATA = [
       {
         id: "mock-1",
-        project_name: "新宿駅前商業ビル新築鉄骨工事",
-        loading_location: "川崎鉄骨工場 第2ヤード",
+        project_name: "もりの里A棟",
+        loading_location: "中出鉄工",
         date: getFormattedDate(0),
-        transport_company: "東日本重機運輸",
-        vehicle_number: "品川 100 か 88-12",
-        driver_name: "佐藤 義男",
-        phone_number: "090-1234-5678",
-        section: "1工区 3節 (5F梁)",
-        cargo_details: "大梁 200×400×12×25 (4本)\n柱コラム □450×22 (2本)\n合計重量: 14.8t",
-        remarks: "現着 08:30 厳守。現場前道路は一方通行のため南側ルートより進入のこと。",
-        updated_at: "2026-08-30 06:30"
-      },
-      {
-        id: "mock-2",
-        project_name: "横浜ベイサイド物流倉庫 B棟",
-        loading_location: "千葉加工センター",
-        date: getFormattedDate(0),
-        transport_company: "丸栄流通サービス",
-        vehicle_number: "横浜 130 あ 45-67",
-        driver_name: "田中 健次",
-        phone_number: "080-9876-5432",
-        section: "2工区 1節 (1F柱)",
-        cargo_details: "SRC柱用ブラケット (8基)\nブレース材 (12本)\n合計重量: 9.2t",
-        remarks: "荷降ろし用クレーン手配済み。相番合図者確認後に入場。",
-        updated_at: "2026-08-30 07:00"
-      },
-      {
-        id: "mock-3",
-        project_name: "新宿駅前商業ビル新築鉄骨工事",
-        loading_location: "川崎鉄骨工場 第1ヤード",
-        date: getFormattedDate(1),
-        transport_company: "東日本重機運輸",
-        vehicle_number: "品川 100 き 90-21",
-        driver_name: "高橋 誠",
-        phone_number: "090-5555-4444",
-        section: "1工区 3節 (6F梁)",
-        cargo_details: "大梁 G5〜G8 (4本)\n間柱 (4本)\n合計重量: 13.0t",
-        remarks: "午前10:00 現場着指定。",
-        updated_at: "2026-08-30 07:15"
+        arrival_time: "08:30",
+        transport_company: "オオニシ",
+        vehicle_number: "金沢90",
+        driver_name: "オクノ",
+        phone_number: "08086994730",
+        section: "1工区 2節",
+        cargo_details: "大梁2台4ｔ",
+        remarks: "金沢マラソンで交通規制あり",
+        updated_at: "2026/08/30 07:33"
       }
     ];
 
     let state = {
-      user: null,               // { name, code, expireAt }
+      user: null,
       gasUrl: localStorage.getItem(STORAGE_KEY_GAS_URL) || "",
-      items: [],                // 運搬データ一覧
-      currentFilterDate: getFormattedDate(0), // 'today', 'tomorrow', 'all', or 'YYYY-MM-DD'
+      items: [],
+      currentFilterDate: getFormattedDate(0),
+      selectedProject: "ALL",
       searchQuery: "",
-      pendingAction: null,      // パスワード確認後の実行関数
-      editingItem: null         // 編集中のデータオブジェクト
+      pendingAction: null,
+      editingItem: null
     };
 
-    // 日付フォーマット補助関数 (YYYY-MM-DD)
+    // 本日・明日等の基準日付を取得 (YYYY-MM-DD)
     function getFormattedDate(offsetDays = 0) {
       const d = new Date();
       d.setDate(d.getDate() + offsetDays);
@@ -448,15 +504,100 @@
       return `${y}-${m}-${day}`;
     }
 
-    // ==========================================
-    // 2. 初期化 & ライフサイクル
-    // ==========================================
+    // 文字列・日付オブジェクトから西暦4桁の YYYY-MM-DD を厳格抽出
+    function normalizeIsoDate(dateVal) {
+      if (!dateVal) return "";
+      
+      const str = String(dateVal).trim();
+      
+      // 1. YYYY-MM-DD または YYYY/MM/DD から年・月・日を直接正規表現で抽出
+      const m = str.match(/^(\d{4})[-\/](\d{1,2})[-\/](\d{1,2})/);
+      if (m) {
+        const y = m[1];
+        const month = m[2].padStart(2, '0');
+        const d = m[3].padStart(2, '0');
+        return `${y}-${month}-${d}`;
+      }
+
+      // 2. Dateオブジェクトまたは特殊文字列のフォールバックパース
+      const d = (dateVal instanceof Date) ? dateVal : new Date(dateVal);
+      if (!isNaN(d.getTime())) {
+        const y = d.getFullYear();
+        const month = String(d.getMonth() + 1).padStart(2, '0');
+        const day = String(d.getDate()).padStart(2, '0');
+        return `${y}-${month}-${day}`;
+      }
+
+      return str.slice(0, 10);
+    }
+
+    // 日本語日付表記 YYYY年MM月DD日(曜日) に変換
+    function formatJapaneseDate(dateVal) {
+      if (!dateVal) return "";
+      const iso = normalizeIsoDate(dateVal);
+      const parts = iso.split("-");
+      if (parts.length === 3) {
+        const y = parts[0];
+        const m = parts[1];
+        const day = parts[2];
+        const d = new Date(Number(y), Number(m) - 1, Number(day));
+        const weekday = !isNaN(d.getTime()) ? WEEKDAYS[d.getDay()] : "";
+        return `${y}年${m}月${day}日(${weekday})`;
+      }
+      return String(dateVal);
+    }
+
+    // トースト通知メッセージ表示 (Alert/Confirm代替)
+    function showToast(message, type = "info") {
+      const container = document.getElementById("toast-container");
+      const toast = document.createElement("div");
+      
+      const bgColor = type === "error" ? "bg-red-600 text-white" 
+                    : type === "success" ? "bg-slate-900 text-amber-400 border border-amber-400/30" 
+                    : "bg-slate-800 text-white";
+
+      toast.className = `${bgColor} px-4 py-3 rounded-xl shadow-xl text-xs font-bold flex items-center justify-between pointer-events-auto animate-toast border border-white/10`;
+      toast.innerHTML = `
+        <div class="flex items-center space-x-2">
+          <i data-lucide="${type === 'error' ? 'alert-circle' : type === 'success' ? 'check-circle' : 'info'}" class="w-4 h-4 flex-shrink-0"></i>
+          <span>${escapeHtml(message)}</span>
+        </div>
+      `;
+      container.appendChild(toast);
+      lucide.createIcons();
+
+      setTimeout(() => {
+        toast.style.opacity = "0";
+        toast.style.transition = "opacity 0.3s ease";
+        setTimeout(() => toast.remove(), 300);
+      }, 3500);
+    }
+
     window.addEventListener("DOMContentLoaded", () => {
       lucide.createIcons();
+      startLiveClock();
       initDateLabels();
       checkAuthSession();
       setupEventListeners();
     });
+
+    // リアルタイム時計（秒単位）
+    function startLiveClock() {
+      const clockEl = document.getElementById("live-clock");
+      function update() {
+        const now = new Date();
+        const y = now.getFullYear();
+        const m = String(now.getMonth() + 1).padStart(2, '0');
+        const d = String(now.getDate()).padStart(2, '0');
+        const w = WEEKDAYS[now.getDay()];
+        const hh = String(now.getHours()).padStart(2, '0');
+        const mm = String(now.getMinutes()).padStart(2, '0');
+        const ss = String(now.getSeconds()).padStart(2, '0');
+        clockEl.textContent = `${y}/${m}/${d}(${w}) ${hh}:${mm}:${ss}`;
+      }
+      update();
+      setInterval(update, 1000);
+    }
 
     function initDateLabels() {
       const today = getFormattedDate(0);
@@ -466,7 +607,6 @@
       document.getElementById("input-date").value = today;
     }
 
-    // 24時間セッションの判定
     function checkAuthSession() {
       const stored = localStorage.getItem(STORAGE_KEY_AUTH);
       if (stored) {
@@ -474,7 +614,6 @@
           const session = JSON.parse(stored);
           const now = Date.now();
           if (session.expireAt && session.expireAt > now) {
-            // セッション有効
             state.user = session;
             onAuthenticated();
             return;
@@ -483,7 +622,6 @@
           console.error("Session parse error", e);
         }
       }
-      // 認証切れまたは未認証
       showLoginModal();
     }
 
@@ -493,14 +631,12 @@
       document.getElementById("control-panel").classList.remove("hidden");
       document.getElementById("current-user-name").textContent = state.user.name + " 様";
       
-      // GAS設定状態の警告バー
       if (!state.gasUrl) {
         document.getElementById("gas-warning-banner").classList.remove("hidden");
       } else {
         document.getElementById("gas-warning-banner").classList.add("hidden");
       }
 
-      // データ取得
       fetchTransportData();
     }
 
@@ -510,7 +646,6 @@
       document.getElementById("control-panel").classList.add("hidden");
       document.getElementById("cards-wrapper").innerHTML = "";
 
-      // GAS未設定の場合はログイン画面内にアラートを表示
       if (!state.gasUrl) {
         document.getElementById("login-gas-alert").classList.remove("hidden");
       } else {
@@ -518,12 +653,8 @@
       }
     }
 
-    // ==========================================
-    // 3. 通信 & データ取得・更新 (POST通信)
-    // ==========================================
     async function apiPost(action, payload = {}) {
       if (!state.gasUrl) {
-        // デモモード（ローカルメモリ処理）
         return handleMockApi(action, payload);
       }
 
@@ -535,7 +666,6 @@
           ...payload
         };
 
-        // GAS CORS回避のためのPOST送信
         const response = await fetch(state.gasUrl, {
           method: "POST",
           headers: {
@@ -545,23 +675,21 @@
         });
 
         if (!response.ok) {
-          throw new Error(`HTTP Error: ${response.status}`);
+          throw new Error(`HTTPエラー: ${response.status}`);
         }
 
         const data = await response.json();
         return data;
       } catch (err) {
         console.error("API Error:", err);
-        return { success: false, error: "通信に失敗しました。URLを確認してください。" };
+        return { success: false, error: "通信に失敗しました。URLと接続を確認してください。" };
       }
     }
 
-    // モック用ローカル処理ハンドラ
     function handleMockApi(action, payload) {
       return new Promise((resolve) => {
         setTimeout(() => {
           if (action === "login") {
-            // デモモード
             resolve({ success: true, user: { name: payload.name, code: payload.code } });
           } else if (action === "getData") {
             if (state.items.length === 0) {
@@ -570,34 +698,34 @@
             resolve({ success: true, data: state.items });
           } else if (action === "saveData") {
             if (payload.password !== AUTH_PASSCODE) {
-              resolve({ success: false, error: "パスワードが不正です" });
+              resolve({ success: false, error: "パスワードが正しくありません" });
               return;
             }
             const item = payload.item;
+            const nowStr = new Date().toISOString().replace('T', ' ').slice(0, 16);
             if (item.id) {
               const idx = state.items.findIndex(x => x.id === item.id);
               if (idx !== -1) {
-                state.items[idx] = { ...item, updated_at: new Date().toISOString().replace('T', ' ').slice(0, 16) };
+                state.items[idx] = { ...item, updated_at: nowStr };
               }
             } else {
               item.id = "mock-" + Date.now();
-              item.updated_at = new Date().toISOString().replace('T', ' ').slice(0, 16);
+              item.updated_at = nowStr;
               state.items.unshift(item);
             }
             resolve({ success: true, data: state.items });
           } else if (action === "deleteData") {
             if (payload.password !== AUTH_PASSCODE) {
-              resolve({ success: false, error: "パスワードが不正です" });
+              resolve({ success: false, error: "パスワードが正しくありません" });
               return;
             }
             state.items = state.items.filter(x => x.id !== payload.id);
             resolve({ success: true, data: state.items });
           }
-        }, 300);
+        }, 200);
       });
     }
 
-    // データ読み込み
     async function fetchTransportData() {
       document.getElementById("loading-state").classList.remove("hidden");
       document.getElementById("empty-state").classList.add("hidden");
@@ -607,28 +735,72 @@
       document.getElementById("loading-state").classList.add("hidden");
 
       if (res && res.success && Array.isArray(res.data)) {
-        state.items = res.data;
+        state.items = res.data.map(item => ({
+          ...item,
+          date: normalizeIsoDate(item.date)
+        }));
+        updateProjectFilterButtons();
         renderCards();
       } else {
-        alert("運搬データの取得に失敗しました: " + (res.error || "通信エラー"));
+        showToast("データ取得に失敗しました: " + (res.error || "通信エラー"), "error");
       }
     }
 
-    // ==========================================
-    // 4. カード一覧 レンダリング
-    // ==========================================
+    function updateProjectFilterButtons() {
+      const container = document.getElementById("project-filter-container");
+      container.innerHTML = "";
+
+      const projects = Array.from(new Set(state.items.map(i => i.project_name).filter(Boolean)));
+
+      // 「すべての物件」ボタン
+      const allBtn = document.createElement("button");
+      allBtn.className = state.selectedProject === "ALL" 
+        ? "px-3 py-1.5 rounded-lg bg-amber-500 text-slate-950 font-bold text-xs whitespace-nowrap shadow-sm transition"
+        : "px-3 py-1.5 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 font-medium text-xs whitespace-nowrap transition";
+      allBtn.textContent = `すべての物件 (${state.items.length})`;
+      allBtn.onclick = () => {
+        state.selectedProject = "ALL";
+        updateProjectFilterButtons();
+        renderCards();
+      };
+      container.appendChild(allBtn);
+
+      // 個別物件ボタン
+      projects.forEach(pName => {
+        const count = state.items.filter(i => i.project_name === pName).length;
+        const btn = document.createElement("button");
+        const isSelected = state.selectedProject === pName;
+        btn.className = isSelected 
+          ? "px-3 py-1.5 rounded-lg bg-slate-900 text-amber-400 font-bold text-xs whitespace-nowrap shadow-sm transition"
+          : "px-3 py-1.5 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 font-medium text-xs whitespace-nowrap transition";
+        btn.innerHTML = `${escapeHtml(pName)} <span class="opacity-70 text-[10px]">(${count})</span>`;
+        btn.onclick = () => {
+          state.selectedProject = pName;
+          updateProjectFilterButtons();
+          renderCards();
+        };
+        container.appendChild(btn);
+      });
+    }
+
     function renderCards() {
       const wrapper = document.getElementById("cards-wrapper");
       wrapper.innerHTML = "";
 
-      // 絞り込み
       const filtered = state.items.filter(item => {
-        // 日付フィルタ
+        const itemDate = normalizeIsoDate(item.date);
+
+        // 1. 日付フィルター
         if (state.currentFilterDate !== 'all') {
-          if (item.date !== state.currentFilterDate) return false;
+          if (itemDate !== state.currentFilterDate) return false;
         }
 
-        // キーワード検索フィルタ
+        // 2. 物件名フィルター
+        if (state.selectedProject !== "ALL") {
+          if (item.project_name !== state.selectedProject) return false;
+        }
+
+        // 3. 検索キーワードフィルター
         if (state.searchQuery) {
           const q = state.searchQuery.toLowerCase();
           const matchTarget = `
@@ -639,6 +811,7 @@
             ${item.section} 
             ${item.cargo_details} 
             ${item.remarks}
+            ${item.arrival_time}
           `.toLowerCase();
           if (!matchTarget.includes(q)) return false;
         }
@@ -653,36 +826,49 @@
         document.getElementById("empty-state").classList.add("hidden");
       }
 
-      // カード要素の生成
       filtered.forEach(item => {
         const card = document.createElement("div");
-        card.className = "bg-white rounded-2xl p-4 sm:p-5 shadow-sm border border-slate-200/80 hover:shadow-md transition space-y-3.5";
+        card.className = "bg-white rounded-2xl p-4 sm:p-5 shadow-sm border border-slate-200/90 hover:shadow-md transition space-y-3.5";
 
         const phoneLink = item.phone_number 
-          ? `<a href="tel:${item.phone_number.replace(/-/g, '')}" class="inline-flex items-center space-x-1 text-emerald-700 bg-emerald-50 hover:bg-emerald-100 font-bold px-2.5 py-1 rounded-lg border border-emerald-200 transition text-xs">
+          ? `<a href="tel:${item.phone_number.replace(/[^0-9]/g, '')}" class="inline-flex items-center space-x-1 text-emerald-700 bg-emerald-50 hover:bg-emerald-100 font-bold px-2.5 py-1 rounded-lg border border-emerald-200 transition text-xs shadow-sm">
               <i data-lucide="phone-call" class="w-3.5 h-3.5"></i>
               <span>${escapeHtml(item.phone_number)}</span>
              </a>`
           : '<span class="text-slate-400 text-xs">-</span>';
 
         const remarksBlock = item.remarks 
-          ? `<div class="bg-amber-50/80 border border-amber-200 rounded-xl p-2.5 text-xs text-amber-900">
+          ? `<div class="bg-amber-50/90 border border-amber-200 rounded-xl p-2.5 text-xs text-amber-950">
                <div class="font-bold flex items-center space-x-1 mb-0.5 text-amber-800">
-                 <i data-lucide="alert-circle" class="w-3.5 h-3.5"></i>
+                 <i data-lucide="alert-circle" class="w-3.5 h-3.5 text-amber-600"></i>
                  <span>備考・注意事項</span>
                </div>
-               <p class="whitespace-pre-line">${escapeHtml(item.remarks)}</p>
+               <p class="whitespace-pre-line leading-relaxed">${escapeHtml(item.remarks)}</p>
              </div>` 
           : '';
 
+        const japaneseDate = formatJapaneseDate(item.date);
+
         card.innerHTML = `
-          <!-- 上段: 物件名 & 工区 & 編集ボタン -->
+          <!-- 上段: 日付(日本語) & 到着時間 & 工区 & アクションボタン -->
           <div class="flex items-start justify-between gap-2 border-b border-slate-100 pb-2.5">
             <div>
-              <div class="flex items-center gap-2 flex-wrap mb-1">
-                <span class="inline-flex items-center px-2.5 py-0.5 rounded-md text-[11px] font-bold bg-slate-900 text-amber-400">
-                  ${escapeHtml(item.date)}
+              <div class="flex items-center gap-1.5 flex-wrap mb-1.5">
+                <!-- 日付バッジ (年/月/日/曜日) -->
+                <span class="inline-flex items-center px-2.5 py-1 rounded-lg text-xs font-bold bg-slate-900 text-amber-400 shadow-sm">
+                  <i data-lucide="calendar" class="w-3.5 h-3.5 mr-1 text-amber-400"></i>
+                  ${escapeHtml(japaneseDate)}
                 </span>
+
+                <!-- 到着時間バッジ -->
+                ${item.arrival_time ? `
+                  <span class="inline-flex items-center px-2.5 py-1 rounded-lg text-xs font-bold bg-amber-500 text-slate-950 shadow-sm">
+                    <i data-lucide="clock" class="w-3.5 h-3.5 mr-1 text-slate-950"></i>
+                    着: ${escapeHtml(item.arrival_time)}
+                  </span>
+                ` : ''}
+
+                <!-- 工区バッジ -->
                 ${item.section ? `
                   <span class="inline-flex items-center px-2 py-0.5 rounded-md text-[11px] font-semibold bg-blue-50 text-blue-700 border border-blue-200">
                     <i data-lucide="layers" class="w-3 h-3 mr-1"></i>${escapeHtml(item.section)}
@@ -693,9 +879,16 @@
                 ${escapeHtml(item.project_name)}
               </h2>
             </div>
-            <button onclick="requestEditItem('${item.id}')" class="flex-shrink-0 p-2 text-slate-400 hover:text-slate-900 hover:bg-slate-100 rounded-lg transition" title="編集する">
-              <i data-lucide="edit" class="w-4 h-4"></i>
-            </button>
+
+            <!-- 操作ボタン（編集 & 削除） -->
+            <div class="flex items-center space-x-1 flex-shrink-0">
+              <button onclick="requestEditItem('${item.id}')" class="p-2 text-slate-500 hover:text-slate-900 hover:bg-slate-100 rounded-lg transition" title="編集する">
+                <i data-lucide="edit-3" class="w-4 h-4"></i>
+              </button>
+              <button onclick="requestDeleteItem('${item.id}')" class="p-2 text-red-500 hover:text-red-700 hover:bg-red-50 rounded-lg transition" title="削除する">
+                <i data-lucide="trash-2" class="w-4 h-4"></i>
+              </button>
+            </div>
           </div>
 
           <!-- 中段: 積込場所 & 配車・運転手情報 -->
@@ -724,7 +917,7 @@
           <!-- 下段: 積み込み内容 -->
           <div class="space-y-1">
             <span class="text-slate-500 font-bold text-[10px] uppercase block">積み込み内容</span>
-            <div class="bg-slate-900 text-slate-100 text-xs rounded-xl p-3 font-mono whitespace-pre-line leading-relaxed border border-slate-800">
+            <div class="bg-slate-900 text-slate-100 text-xs rounded-xl p-3 font-mono whitespace-pre-line leading-relaxed border border-slate-800 shadow-inner">
               ${escapeHtml(item.cargo_details)}
             </div>
           </div>
@@ -754,11 +947,8 @@
         .replace(/'/g, '&#039;');
     }
 
-    // ==========================================
-    // 5. イベントリスナー & フォーム制御
-    // ==========================================
     function setupEventListeners() {
-      // ログインフォーム送信
+      // ログイン送信
       document.getElementById("form-login").addEventListener("submit", async (e) => {
         e.preventDefault();
         const name = document.getElementById("login-name").value.trim();
@@ -782,6 +972,7 @@
           state.user = { name, code, expireAt };
           localStorage.setItem(STORAGE_KEY_AUTH, JSON.stringify(state.user));
           onAuthenticated();
+          showToast("認証に成功しました", "success");
         } else {
           errorEl.textContent = res.error || "氏名またはアクセスコードが一致しません";
           errorEl.classList.remove("hidden");
@@ -790,11 +981,10 @@
 
       // ログアウト
       document.getElementById("btn-logout").addEventListener("click", () => {
-        if (confirm("ログアウトしますか？（再度アクセスコードの入力が必要になります）")) {
-          localStorage.removeItem(STORAGE_KEY_AUTH);
-          state.user = null;
-          showLoginModal();
-        }
+        localStorage.removeItem(STORAGE_KEY_AUTH);
+        state.user = null;
+        showLoginModal();
+        showToast("ログアウトしました", "info");
       });
 
       // 設定モーダル
@@ -808,11 +998,11 @@
 
       function updateFilterBtnStyles(activeBtn) {
         [btnToday, btnTomorrow, btnAll].forEach(b => {
-          b.className = "flex-1 sm:flex-none px-3 py-2 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 transition";
+          b.className = "flex-1 sm:flex-none px-3 py-2 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 transition whitespace-nowrap";
         });
         inputCustomDate.value = "";
         if (activeBtn) {
-          activeBtn.className = "flex-1 sm:flex-none px-3 py-2 rounded-lg bg-slate-900 text-white font-bold transition";
+          activeBtn.className = "flex-1 sm:flex-none px-3 py-2 rounded-lg bg-slate-900 text-white font-bold transition whitespace-nowrap";
         }
       }
 
@@ -838,7 +1028,7 @@
         if (e.target.value) {
           state.currentFilterDate = e.target.value;
           [btnToday, btnTomorrow, btnAll].forEach(b => {
-            b.className = "flex-1 sm:flex-none px-3 py-2 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 transition";
+            b.className = "flex-1 sm:flex-none px-3 py-2 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 transition whitespace-nowrap";
           });
           renderCards();
         }
@@ -867,9 +1057,10 @@
       // リフレッシュ
       document.getElementById("btn-refresh").addEventListener("click", () => {
         fetchTransportData();
+        showToast("データを更新しました", "info");
       });
 
-      // 新規登録ボタン（パスワード確認トリガー）
+      // 新規登録ボタン
       document.getElementById("btn-open-create").addEventListener("click", () => {
         promptActionPassword("運搬情報の新規登録", () => {
           openCreateModal();
@@ -893,6 +1084,43 @@
         }
       });
 
+      // 削除実行フォーム送信
+      document.getElementById("form-delete-confirm").addEventListener("submit", async (e) => {
+        e.preventDefault();
+        const id = document.getElementById("delete-target-id").value;
+        const pwd = document.getElementById("delete-password").value.trim();
+        const errorEl = document.getElementById("delete-auth-error");
+        const btnSubmit = document.getElementById("btn-submit-delete");
+
+        if (pwd !== AUTH_PASSCODE) {
+          errorEl.textContent = "パスワードが正しくありません";
+          errorEl.classList.remove("hidden");
+          return;
+        }
+
+        btnSubmit.disabled = true;
+        btnSubmit.innerHTML = `<span>削除中...</span>`;
+        errorEl.classList.add("hidden");
+
+        const res = await apiPost("deleteData", {
+          password: AUTH_PASSCODE,
+          id: id
+        });
+
+        btnSubmit.disabled = false;
+        btnSubmit.innerHTML = `<i data-lucide="trash-2" class="w-3.5 h-3.5"></i><span>削除を実行</span>`;
+        lucide.createIcons();
+
+        if (res && res.success) {
+          closeDeleteModal();
+          showToast("運搬情報を削除しました", "success");
+          fetchTransportData();
+        } else {
+          errorEl.textContent = res.error || "削除に失敗しました";
+          errorEl.classList.remove("hidden");
+        }
+      });
+
       // 登録・編集フォーム送信
       document.getElementById("form-transport").addEventListener("submit", async (e) => {
         e.preventDefault();
@@ -903,13 +1131,14 @@
         const entryData = {
           id: document.getElementById("entry-id").value || null,
           project_name: document.getElementById("input-project-name").value.trim(),
-          loading_location: document.getElementById("input-loading-location").value.trim(),
           date: document.getElementById("input-date").value,
+          arrival_time: document.getElementById("input-arrival-time").value.trim(),
+          section: document.getElementById("input-section").value.trim(),
+          loading_location: document.getElementById("input-loading-location").value.trim(),
           transport_company: document.getElementById("input-transport-company").value.trim(),
           vehicle_number: document.getElementById("input-vehicle-number").value.trim(),
           driver_name: document.getElementById("input-driver-name").value.trim(),
           phone_number: document.getElementById("input-phone-number").value.trim(),
-          section: document.getElementById("input-section").value.trim(),
           cargo_details: document.getElementById("input-cargo-details").value.trim(),
           remarks: document.getElementById("input-remarks").value.trim()
         };
@@ -925,35 +1154,22 @@
 
         if (res && res.success) {
           closeEditModal();
+          showToast("運搬情報を保存しました", "success");
           fetchTransportData();
         } else {
-          alert("保存に失敗しました: " + (res.error || "エラーが発生しました"));
+          showToast("保存に失敗しました: " + (res.error || "エラーが発生しました"), "error");
         }
       });
 
-      // 削除ボタン
-      document.getElementById("btn-delete-entry").addEventListener("click", async () => {
+      // モーダル内削除ボタン
+      document.getElementById("btn-modal-delete-entry").addEventListener("click", () => {
         const id = document.getElementById("entry-id").value;
         if (!id) return;
-        if (!confirm("この運搬情報を削除してもよろしいですか？")) return;
-
-        const res = await apiPost("deleteData", {
-          password: AUTH_PASSCODE,
-          id: id
-        });
-
-        if (res && res.success) {
-          closeEditModal();
-          fetchTransportData();
-        } else {
-          alert("削除に失敗しました: " + (res.error || "エラーが発生しました"));
-        }
+        closeEditModal();
+        requestDeleteItem(id);
       });
     }
 
-    // ==========================================
-    // 6. モーダル開閉制御
-    // ==========================================
     function promptActionPassword(title, callback) {
       document.getElementById("auth-action-title").textContent = title;
       document.getElementById("action-password").value = "";
@@ -976,13 +1192,36 @@
       });
     }
 
+    // 削除確認モーダルを開く
+    function requestDeleteItem(id) {
+      const item = state.items.find(x => x.id === id);
+      if (!item) return;
+
+      document.getElementById("delete-target-id").value = item.id;
+      document.getElementById("delete-target-title").textContent = item.project_name;
+      document.getElementById("delete-password").value = "";
+      document.getElementById("delete-auth-error").classList.add("hidden");
+      document.getElementById("modal-delete-confirm").classList.remove("hidden");
+      setTimeout(() => document.getElementById("delete-password").focus(), 100);
+      lucide.createIcons();
+    }
+
+    function closeDeleteModal() {
+      document.getElementById("modal-delete-confirm").classList.add("hidden");
+    }
+
     function openCreateModal() {
       state.editingItem = null;
       document.getElementById("edit-form-title").innerHTML = `<i data-lucide="plus-circle" class="w-5 h-5 text-amber-500"></i><span>新規運搬情報の登録</span>`;
       document.getElementById("form-transport").reset();
       document.getElementById("entry-id").value = "";
-      document.getElementById("input-date").value = state.currentFilterDate !== 'all' ? state.currentFilterDate : getFormattedDate(0);
-      document.getElementById("btn-delete-entry").classList.add("hidden");
+      
+      const defaultDate = (state.currentFilterDate && state.currentFilterDate !== 'all') 
+        ? state.currentFilterDate 
+        : getFormattedDate(0);
+      document.getElementById("input-date").value = defaultDate;
+
+      document.getElementById("btn-modal-delete-entry").classList.add("hidden");
       document.getElementById("modal-edit-form").classList.remove("hidden");
       lucide.createIcons();
     }
@@ -992,9 +1231,13 @@
       document.getElementById("edit-form-title").innerHTML = `<i data-lucide="edit-3" class="w-5 h-5 text-amber-500"></i><span>運搬情報の編集</span>`;
       document.getElementById("entry-id").value = item.id;
       document.getElementById("input-project-name").value = item.project_name || "";
-      document.getElementById("input-loading-location").value = item.loading_location || "";
-      document.getElementById("input-date").value = item.date || getFormattedDate(0);
+      
+      const validDate = normalizeIsoDate(item.date) || getFormattedDate(0);
+      document.getElementById("input-date").value = validDate;
+
+      document.getElementById("input-arrival-time").value = item.arrival_time || "";
       document.getElementById("input-section").value = item.section || "";
+      document.getElementById("input-loading-location").value = item.loading_location || "";
       document.getElementById("input-transport-company").value = item.transport_company || "";
       document.getElementById("input-vehicle-number").value = item.vehicle_number || "";
       document.getElementById("input-driver-name").value = item.driver_name || "";
@@ -1002,7 +1245,7 @@
       document.getElementById("input-cargo-details").value = item.cargo_details || "";
       document.getElementById("input-remarks").value = item.remarks || "";
 
-      document.getElementById("btn-delete-entry").classList.remove("hidden");
+      document.getElementById("btn-modal-delete-entry").classList.remove("hidden");
       document.getElementById("modal-edit-form").classList.remove("hidden");
       lucide.createIcons();
     }
@@ -1027,15 +1270,14 @@
       localStorage.setItem(STORAGE_KEY_GAS_URL, url);
       closeSettingsModal();
       
-      // 未設定アラートを非表示化
       document.getElementById("login-gas-alert").classList.add("hidden");
       if (url) {
         document.getElementById("gas-warning-banner").classList.add("hidden");
-        alert("GAS連携URLを保存しました。氏名とアクセスコードでログインしてください。");
       } else {
         document.getElementById("gas-warning-banner").classList.remove("hidden");
       }
       
+      showToast("GAS連携URLを保存しました", "success");
       if (state.user) {
         fetchTransportData();
       }
@@ -1048,6 +1290,7 @@
       closeSettingsModal();
       document.getElementById("login-gas-alert").classList.remove("hidden");
       document.getElementById("gas-warning-banner").classList.remove("hidden");
+      showToast("設定をリセットしました", "info");
       if (state.user) {
         fetchTransportData();
       }
